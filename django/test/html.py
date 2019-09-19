@@ -3,11 +3,14 @@
 import re
 from html.parser import HTMLParser
 
-WHITESPACE = re.compile(r'\s+')
+# ASCII whitespace is U+0009 TAB, U+000A LF, U+000C FF, U+000D CR, or U+0020
+# SPACE.
+# https://infra.spec.whatwg.org/#ascii-whitespace
+ASCII_WHITESPACE = re.compile(r'[\t\n\f\r ]+')
 
 
 def normalize_whitespace(string):
-    return WHITESPACE.sub(' ', string)
+    return ASCII_WHITESPACE.sub(' ', string)
 
 
 class Element:
@@ -52,9 +55,7 @@ class Element:
                 child.finalize()
 
     def __eq__(self, element):
-        if not hasattr(element, 'name'):
-            return False
-        if hasattr(element, 'name') and self.name != element.name:
+        if not hasattr(element, 'name') or self.name != element.name:
             return False
         if len(self.attributes) != len(element.attributes):
             return False
@@ -71,12 +72,10 @@ class Element:
                     other_value = other_attr
                 if attr != other_attr or value != other_value:
                     return False
-        if self.children != element.children:
-            return False
-        return True
+        return self.children == element.children
 
     def __hash__(self):
-        return hash((self.name,) + tuple(a for a in self.attributes))
+        return hash((self.name, *self.attributes))
 
     def _count(self, element, count=True):
         if not isinstance(element, str):
@@ -122,7 +121,7 @@ class Element:
             output += ''.join(str(c) for c in self.children)
             output += '\n</%s>' % self.name
         else:
-            output += ' />'
+            output += '>'
         return output
 
     def __repr__(self):
@@ -142,13 +141,16 @@ class HTMLParseError(Exception):
 
 
 class Parser(HTMLParser):
-    SELF_CLOSING_TAGS = (
-        'br', 'hr', 'input', 'img', 'meta', 'spacer', 'link', 'frame', 'base',
-        'col',
-    )
+    # https://html.spec.whatwg.org/#void-elements
+    SELF_CLOSING_TAGS = {
+        'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta',
+        'param', 'source', 'track', 'wbr',
+        # Deprecated tags
+        'frame', 'spacer',
+    }
 
     def __init__(self):
-        HTMLParser.__init__(self, convert_charrefs=False)
+        super().__init__()
         self.root = RootElement()
         self.open_tags = []
         self.element_positions = {}
@@ -181,7 +183,7 @@ class Parser(HTMLParser):
         # Special case handling of 'class' attribute, so that comparisons of DOM
         # instances are not sensitive to ordering of classes.
         attrs = [
-            (name, " ".join(sorted(value.split(" "))))
+            (name, ' '.join(sorted(value for value in ASCII_WHITESPACE.split(value) if value)))
             if name == "class"
             else (name, value)
             for name, value in attrs
@@ -205,12 +207,6 @@ class Parser(HTMLParser):
 
     def handle_data(self, data):
         self.current.append(data)
-
-    def handle_charref(self, name):
-        self.current.append('&%s;' % name)
-
-    def handle_entityref(self, name):
-        self.current.append('&%s;' % name)
 
 
 def parse_html(html):

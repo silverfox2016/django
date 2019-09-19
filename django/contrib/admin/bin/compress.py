@@ -28,7 +28,7 @@ Compiler library and Java version 6 or later."""
     parser.add_argument("-q", "--quiet", action="store_false", dest="verbose")
     options = parser.parse_args()
 
-    compiler = Path(closure_compiler if closure_compiler else options.compiler).expanduser()
+    compiler = Path(closure_compiler or options.compiler).expanduser()
     if not compiler.exists():
         sys.exit(
             "Google Closure compiler jar file %s not found. Please use the -c "
@@ -49,10 +49,16 @@ Compiler library and Java version 6 or later."""
         to_compress = file_path.expanduser()
         if to_compress.exists():
             to_compress_min = to_compress.with_suffix('.min.js')
-            cmd = "java -jar %s --js %s --js_output_file %s" % (compiler, to_compress, to_compress_min)
+            cmd = [
+                'java',
+                '-jar', str(compiler),
+                '--rewrite_polyfills=false',
+                '--js', str(to_compress),
+                '--js_output_file', str(to_compress_min),
+            ]
             if options.verbose:
-                sys.stdout.write("Running: %s\n" % cmd)
-            subprocess.call(cmd.split())
+                sys.stdout.write("Running: %s\n" % ' '.join(cmd))
+            subprocess.run(cmd)
         else:
             sys.stdout.write("File %s not found. Sure it exists?\n" % to_compress)
 

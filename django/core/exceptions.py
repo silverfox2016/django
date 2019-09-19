@@ -63,6 +63,11 @@ class RequestDataTooBig(SuspiciousOperation):
     pass
 
 
+class RequestAborted(Exception):
+    """The request was closed before it was completed, or timed out."""
+    pass
+
+
 class PermissionDenied(Exception):
     """The user did not have permission to do that"""
     pass
@@ -102,8 +107,6 @@ class ValidationError(Exception):
         list or dictionary can be an actual `list` or `dict` or an instance
         of ValidationError with its `error_list` or `error_dict` attribute set.
         """
-
-        # PY2 can't pickle naive exception: http://bugs.python.org/issue1692335.
         super().__init__(message, code, params)
 
         if isinstance(message, ValidationError):
@@ -182,4 +185,9 @@ class ValidationError(Exception):
 
 class EmptyResultSet(Exception):
     """A database query predicate is impossible."""
+    pass
+
+
+class SynchronousOnlyOperation(Exception):
+    """The user tried to call a sync-only function from an async context."""
     pass
